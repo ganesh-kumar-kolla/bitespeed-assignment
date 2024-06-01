@@ -83,7 +83,13 @@ This project implements a contact reconciliation service using Flask and SQLite.
     pip install -r requirements.txt
     ```
 
-4. **Run the application:**
+4. **Initialize the database :**
+
+    ```cmd
+    python db_init.py
+    ```
+
+5. **Run the application:**
 
     ```cmd
     python app.py
