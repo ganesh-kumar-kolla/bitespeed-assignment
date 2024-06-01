@@ -112,5 +112,40 @@ def identify_contact():
         # Re-query all linked contacts to ensure all secondary contacts are correctly included
         cursor.execute('SELECT * FROM contacts WHERE id = ? OR linkedId = ?', (primary_id, primary_id))
         linked_contacts = cursor.fetchall()
+
+    # Check if the new contact should become the primary contact
+    if new_email or new_phone_number:
+        if new_email and new_phone_number:
+            cursor.execute('SELECT * FROM contacts WHERE email = ? OR phoneNumber = ?', (email, phone_number))
+            new_contacts = cursor.fetchall()
+            new_contacts = [dict(contact) for contact in new_contacts]
+            new_primary_contact = min(new_contacts, key=lambda c: c['createdAt'])
+            if new_primary_contact['id'] != primary_id:
+                # Update link precedence
+                cursor.execute('UPDATE contacts SET linkPrecedence = "secondary" WHERE id = ?', (primary_id,))
+                cursor.execute('UPDATE contacts SET linkPrecedence = "primary" WHERE id = ?', (new_primary_contact['id'],))
+                primary_id = new_primary_contact['id']
+
+    # Collect all unique emails and phone numbers
+    primary_email = primary_contact['email']
+    primary_phone_number = primary_contact['phoneNumber']
+    
+    all_emails = [primary_email] if primary_email else []
+    all_emails.extend([contact['email'] for contact in linked_contacts if contact['email'] and contact['email'] != primary_email])
+    
+    all_phone_numbers = [primary_phone_number] if primary_phone_number else []
+    all_phone_numbers.extend([contact['phoneNumber'] for contact in linked_contacts if contact['phoneNumber'] and contact['phoneNumber'] != primary_phone_number])
+
+    secondary_ids = [contact['id'] for contact in linked_contacts if contact['id'] != primary_id]
+
+    response = ContactResponse(
+        primaryContactId=primary_id,
+        emails=all_emails,
+        phoneNumbers=all_phone_numbers,
+        secondaryContactIds=secondary_ids
+    )
+
+    return jsonify({"contact": response.__dict__})
+
 if __name__ == "__main__":
     app.run(host='127.0.0.1', port='5000', debug=True)
