@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, json, Response
 import sqlite3
 from datetime import datetime
  
@@ -67,7 +67,12 @@ def identify_contact():
             phoneNumbers=[phone_number] if phone_number else [],
             secondaryContactIds=[]
         )
-        return jsonify({"contact": response.__dict__})
+        # return jsonify({"contact": response.__dict__})
+
+        response_dict = {"contact": response.__dict__}
+        json_response = json.dumps(response_dict, sort_keys=False,indent=4)
+
+        return Response(json_response, mimetype='application/json')
  
 
     # Find primary contact and gather information
@@ -145,7 +150,11 @@ def identify_contact():
         secondaryContactIds=secondary_ids
     )
 
-    return jsonify({"contact": response.__dict__})
+    # return jsonify({"contact": response.__dict__})
+    response_dict = {"contact": response.__dict__}
+    json_response = json.dumps(response_dict, sort_keys=False)
+
+    return Response(json_response, mimetype='application/json')
 
 if __name__ == "__main__":
     app.run(host='127.0.0.1', port='5000', debug=True)
