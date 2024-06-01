@@ -69,5 +69,48 @@ def identify_contact():
         )
         return jsonify({"contact": response.__dict__})
  
+
+    # Find primary contact and gather information
+    contacts = [dict(contact) for contact in contacts]
+
+    # Get all linked contacts
+    linked_ids = set()
+    for contact in contacts:
+        if contact['linkedId']:
+            linked_ids.add(contact['linkedId'])
+        else:
+            linked_ids.add(contact['id'])
+
+    linked_contacts = []
+    for linked_id in linked_ids:
+        cursor.execute('SELECT * FROM contacts WHERE id = ? OR linkedId = ?', (linked_id, linked_id))
+        linked_contacts.extend(cursor.fetchall())
+
+    linked_contacts = [dict(contact) for contact in linked_contacts]
+    primary_contact = min(linked_contacts, key=lambda c: c['createdAt'])
+    primary_id = primary_contact['id']
+
+    existing_emails = {contact['email'] for contact in linked_contacts if contact['email']}
+    existing_phone_numbers = {contact['phoneNumber'] for contact in linked_contacts if contact['phoneNumber']}
+
+    new_email = email and email not in existing_emails
+    new_phone_number = phone_number and phone_number not in existing_phone_numbers
+
+    if new_email or new_phone_number:
+        cursor.execute('''
+            INSERT INTO contacts (phoneNumber, email, linkedId, linkPrecedence, createdAt, updatedAt)
+            VALUES (?, ?, ?, 'secondary', ?, ?)
+        ''', (phone_number, email, primary_id, datetime.utcnow(), datetime.utcnow()))
+        conn.commit()
+        
+        new_contact_id = cursor.lastrowid
+        if new_email:
+            existing_emails.add(email)
+        if new_phone_number:
+            existing_phone_numbers.add(phone_number)
+
+        # Re-query all linked contacts to ensure all secondary contacts are correctly included
+        cursor.execute('SELECT * FROM contacts WHERE id = ? OR linkedId = ?', (primary_id, primary_id))
+        linked_contacts = cursor.fetchall()
 if __name__ == "__main__":
     app.run(host='127.0.0.1', port='5000', debug=True)
